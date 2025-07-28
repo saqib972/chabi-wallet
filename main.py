@@ -2,32 +2,39 @@ import os
 from fastapi import FastAPI, HTTPException
 from web3 import Web3
 from dotenv import load_dotenv
-from openai import OpenAI
+import openai
 
-# -------------------- Load .env --------------------
-load_dotenv()
+# -------------------- Load environment variables --------------------
+if os.getenv("RAILWAY_ENVIRONMENT_ID"):
+    ALCHEMY_RPC = os.environ.get("ALCHEMY_RPC")
+    OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+    OPENAI_BASE_URL = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1")
+else:
+    load_dotenv()
+    ALCHEMY_RPC = os.getenv("ALCHEMY_RPC")
+    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+    OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
 
-ALCHEMY_RPC = os.getenv("ALCHEMY_RPC")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
-
-if not ALCHEMY_RPC:
-    raise RuntimeError("❌ ALCHEMY_RPC is missing in .env file")
+if not ALCHEMY_RPC or not OPENAI_API_KEY:
+    raise RuntimeError("❌ Required environment variables are missing")
 
 # -------------------- Init Clients --------------------
 web3 = Web3(Web3.HTTPProvider(ALCHEMY_RPC))
 
-client = OpenAI(
-    api_key=OPENAI_API_KEY,
-    base_url=OPENAI_BASE_URL
-)
+openai.api_key = OPENAI_API_KEY
+openai.base_url = OPENAI_BASE_URL
+openai.headers = {
+    "Authorization": f"Bearer {OPENAI_API_KEY}",
+    "HTTP-Referer": "https://chabi-wallet-backend-production.up.railway.app",
+    "X-Title": "chabi-wallet"
+}
 
 # -------------------- FastAPI App --------------------
 app = FastAPI(title="Chabi Wallet API")
 
 @app.get("/")
 def home():
-    return {"message": "🚀 Chabi Wallet ab sa live!"}
+    return {"message": "🚀 chabi wallet ab live ha!"}
 
 @app.get("/debug_rpc")
 def debug_rpc():
@@ -71,8 +78,8 @@ def explain_wallet_balance(wallet: str):
             "Also suggest why a wallet might hold that much ETH (whale, DAO, exchange, etc.)."
         )
 
-        response = client.chat.completions.create(
-            model="mistralai/mistral-7b-instruct",  # ✅ Confirmed working on OpenRouter
+        response = openai.ChatCompletion.create(
+            model="mistralai/mistral-7b-instruct",
             messages=[
                 {"role": "system", "content": "You are a helpful assistant for a Web3 wallet app."},
                 {"role": "user", "content": prompt}
